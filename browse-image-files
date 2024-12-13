@@ -1,0 +1,29 @@
+#!/bin/bash
+
+# This script exports the contents of a container image to a temporary directory for browsing.
+# It requires docker to be installed and running.
+# It takes the image name as a command line argument.
+
+set -eu
+
+# Check if an image name was provided as an argument
+if [ $# -eq 0 ]; then
+  echo "Please provide a image name as an argument." >&2
+  exit 1
+fi
+
+image_name=$1
+
+echo "Creating container from image ${image_name}..." >&2
+container_id=$(docker create "${image_name}")
+
+export_dir=$(mktemp -d)
+echo "Exporting container filesystem. It might take a while for large images..." >&2
+docker export "${container_id}" > "${export_dir}/container.tar"
+echo "Export complete, removing temporary container..." >&2
+docker rm "${container_id}"
+
+echo "Extracting exported data..." >&2
+tar -xf "${export_dir}/container.tar" -C "${export_dir}" && rm -rf "${export_dir}/container.tar"
+
+echo "Done, you can browse the image contents at: $export_dir"

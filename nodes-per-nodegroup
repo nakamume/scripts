@@ -1,0 +1,21 @@
+#!/bin/bash
+
+nodes=$(kubectl get nodes -o json)
+
+# Group nodes by nodegroup label and kubelet version and show the count of each group
+echo "$nodes" | jq -r '
+  .items[] |
+  {
+    nodegroup: (.metadata.labels.nodegroup // .metadata.labels["karpenter.sh/nodepool"]),
+    kubeletVersion: .status.nodeInfo.kubeletVersion
+  }' | jq -s 'group_by(.nodegroup) |
+  map({
+    nodegroup: .[0].nodegroup,
+    kubeletVersions: group_by(.kubeletVersion) |
+    map({
+      kubeletVersion: .[0].kubeletVersion,
+      count: length
+    })
+  })' | jq -r '.[] | {nodegroup: .nodegroup, kubeletVersions: .kubeletVersions} |
+  .nodegroup as $nodegroup | .kubeletVersions[] | [$nodegroup, .kubeletVersion, .count] | @tsv' | sort -k2,2V | column -t
+
